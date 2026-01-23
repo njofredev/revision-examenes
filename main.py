@@ -16,6 +16,7 @@ def conectar_db():
     user = os.getenv("POSTGRES_USER")
     password = os.getenv("POSTGRES_PASSWORD")
     port = os.getenv("POSTGRES_PORT")
+    sslmode="disable"
 
     # Si no están en el entorno, buscamos en st.secrets
     if not host:
@@ -27,6 +28,7 @@ def conectar_db():
                 user = db_conf["user"]
                 password = db_conf["password"]
                 port = db_conf["port"]
+                sslmode="disable"
         except:
             pass
 
@@ -41,7 +43,7 @@ def conectar_db():
             user=user, 
             password=password, 
             port=port, 
-            sslmode="require"
+            sslmode="disable"
         )
     except Exception as e:
         st.error(f"❌ Error de conexión física a la DB: {e}")
