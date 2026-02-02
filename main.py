@@ -95,6 +95,8 @@ if st.button("Consultar"):
         cur = conn.cursor(cursor_factory=RealDictCursor)
         es_orden = folio_busqueda.isdigit()
         
+        pdf = None
+        
         if es_orden:
             cur.execute("SELECT * FROM ordenes_clinicas WHERE folio_orden = %s", (folio_busqueda,))
             maestro = cur.fetchone()
@@ -117,10 +119,6 @@ if st.button("Consultar"):
                 pdf.ln(10)
                 pdf.set_font('Helvetica', 'B', 9)
                 pdf.cell(0, 5, "Firma y Timbre Médico", 0, 1, 'C')
-                
-                # Generar descarga
-                out_o = pdf.output(dest='S')
-                st.download_button("📥 Descargar Orden", data=bytes(out_o), file_name=f"Orden_{folio_busqueda}.pdf", mime="application/pdf")
         else:
             cur.execute("SELECT * FROM cotizaciones WHERE folio = %s", (folio_busqueda.upper(),))
             maestro = cur.fetchone()
@@ -129,12 +127,10 @@ if st.button("Consultar"):
                 codigos = [r['codigo_examen'] for r in cur.fetchall()]
                 df_final = df_aranceles[df_aranceles["Código"].isin(codigos)]
                 
-                # CORRECCIÓN DE NameError: Se eliminó el texto '' que causaba el fallo
                 pdf = TabancuraPDF("PRESUPUESTO DE EXÁMENES", f"FOLIO: {maestro['folio']}")
                 pdf.add_page()
                 pdf.dibujar_datos_paciente(maestro['nombre_paciente'], maestro['documento_id'], maestro['fecha_cotizacion'].strftime('%d/%m/%Y'))
                 
-                # Encabezados con las 4 columnas de valores
                 pdf.set_font('Helvetica', 'B', 7); pdf.set_fill_color(*AZUL_TABANCURA); pdf.set_text_color(255)
                 pdf.cell(15, 8, "CÓDIGO", 1, 0, 'C', True)
                 pdf.cell(55, 8, "EXAMEN", 1, 0, 'L', True)
@@ -152,25 +148,37 @@ if st.button("Consultar"):
                     pdf.cell(30, 7, f"${r['Copago']:,.0f}", 1, 0, 'R')
                     pdf.cell(30, 7, f"${r['Particular General']:,.0f}", 1, 0, 'R')
                     pdf.cell(30, 7, f"${r['Particular Preferencial']:,.0f}", 1, 1, 'R')
-                    
                     totales["Bono"] += r['Bono Fonasa']
                     totales["Copago"] += r['Copago']
                     totales["Gral"] += r['Particular General']
                     totales["Pref"] += r['Particular Preferencial']
                 
-                # Fila de Totales corregida
                 pdf.set_font('Helvetica', 'B', 7); pdf.set_fill_color(240, 240, 240)
                 pdf.cell(70, 8, " TOTALES ACUMULADOS", 1, 0, 'L', True)
                 pdf.cell(30, 8, f"${totales['Bono']:,.0f}", 1, 0, 'R', True)
                 pdf.cell(30, 8, f"${totales['Copago']:,.0f}", 1, 0, 'R', True)
                 pdf.cell(30, 8, f"${totales['Gral']:,.0f}", 1, 0, 'R', True)
                 pdf.cell(30, 8, f"${totales['Pref']:,.0f}", 1, 1, 'R', True)
+
+        if pdf:
+            try:
+                # Se genera el contenido del PDF en memoria
+                pdf_output = pdf.output(dest='S')
+                # Se asegura que los datos pasados al botón sean bytes
+                pdf_bytes = bytes(pdf_output) if isinstance(pdf_output, (bytes, bytearray)) else pdf_output.encode('latin-1')
                 
-                # Generar descarga
-                out_c = pdf.output(dest='S')
-                st.download_button("📥 Descargar Cotización", data=bytes(out_c), file_name=f"Cotizacion_{folio_busqueda}.pdf", mime="application/pdf")
-            else:
-                st.error("❌ No se encontró el folio.")
+                st.success("✅ Documento generado con éxito")
+                st.download_button(
+                    label="📥 Descargar PDF Reimpreso",
+                    data=pdf_bytes,
+                    file_name=f"Reimpresion_{folio_busqueda}.pdf",
+                    mime="application/pdf",
+                    use_container_width=True
+                )
+            except Exception as e:
+                st.error(f"❌ Error al procesar el archivo: {e}")
+        else:
+            st.error("❌ No se encontró el folio o ID ingresado.")
         
         cur.close()
         conn.close()
