@@ -105,7 +105,7 @@ if st.button("Consultar"):
                 
                 pdf = TabancuraPDF("ORDEN DE EXÁMENES", f"FOLIO ORDEN: {maestro['folio_orden']}")
                 pdf.add_page()
-                pdf.dibujar_datos_paciente("Ver en Ficha", maestro['rut_paciente'], maestro['fecha_creacion'].strftime('%d/%m/%Y'))
+                pdf.dibujar_datos_paciente("Consultar en Ficha", maestro['rut_paciente'], maestro['fecha_creacion'].strftime('%d/%m/%Y'))
                 
                 pdf.set_font('Helvetica', 'B', 9); pdf.set_fill_color(240, 240, 240)
                 pdf.cell(35, 10, " CÓDIGO", 1, 0, 'L', True)
@@ -113,7 +113,14 @@ if st.button("Consultar"):
                 for _, r in df_final.iterrows():
                     pdf.cell(35, 8, f" {r['Código']}", 1, 0, 'L')
                     pdf.cell(155, 8, f" {pdf.clean_txt(r['Nombre'][:80])}", 1, 1, 'L')
-                pdf.ln(10); pdf.set_font('Helvetica', 'B', 9); pdf.cell(0, 5, "Firma y Timbre Médico", 0, 1, 'C') [cite: 52]
+                
+                pdf.ln(10)
+                pdf.set_font('Helvetica', 'B', 9)
+                pdf.cell(0, 5, "Firma y Timbre Médico", 0, 1, 'C')
+                
+                # Generar descarga
+                out_o = pdf.output(dest='S')
+                st.download_button("📥 Descargar Orden", data=bytes(out_o), file_name=f"Orden_{folio_busqueda}.pdf", mime="application/pdf")
         else:
             cur.execute("SELECT * FROM cotizaciones WHERE folio = %s", (folio_busqueda.upper(),))
             maestro = cur.fetchone()
@@ -122,15 +129,19 @@ if st.button("Consultar"):
                 codigos = [r['codigo_examen'] for r in cur.fetchall()]
                 df_final = df_aranceles[df_aranceles["Código"].isin(codigos)]
                 
-                pdf = TabancuraPDF("PRESUPUESTO DE EXÁMENES", f"FOLIO: {maestro['folio']}") [cite: 39]
+                # CORRECCIÓN DE NameError: Se eliminó el texto '' que causaba el fallo
+                pdf = TabancuraPDF("PRESUPUESTO DE EXÁMENES", f"FOLIO: {maestro['folio']}")
                 pdf.add_page()
                 pdf.dibujar_datos_paciente(maestro['nombre_paciente'], maestro['documento_id'], maestro['fecha_cotizacion'].strftime('%d/%m/%Y'))
                 
-                # Encabezados de 4 columnas de valores
+                # Encabezados con las 4 columnas de valores
                 pdf.set_font('Helvetica', 'B', 7); pdf.set_fill_color(*AZUL_TABANCURA); pdf.set_text_color(255)
-                pdf.cell(15, 8, "CÓDIGO", 1, 0, 'C', True); pdf.cell(55, 8, "EXAMEN", 1, 0, 'L', True)
-                pdf.cell(30, 8, "BONO FONASA", 1, 0, 'C', True); pdf.cell(30, 8, "COPAGO", 1, 0, 'C', True)
-                pdf.cell(30, 8, "P. GENERAL", 1, 0, 'C', True); pdf.cell(30, 8, "P. PREF.", 1, 1, 'C', True) [cite: 24, 43]
+                pdf.cell(15, 8, "CÓDIGO", 1, 0, 'C', True)
+                pdf.cell(55, 8, "EXAMEN", 1, 0, 'L', True)
+                pdf.cell(30, 8, "BONO FONASA", 1, 0, 'C', True)
+                pdf.cell(30, 8, "COPAGO", 1, 0, 'C', True)
+                pdf.cell(30, 8, "P. GENERAL", 1, 0, 'C', True)
+                pdf.cell(30, 8, "P. PREF.", 1, 1, 'C', True)
                 
                 pdf.set_text_color(0); pdf.set_font('Helvetica', '', 7)
                 totales = {"Bono": 0, "Copago": 0, "Gral": 0, "Pref": 0}
@@ -141,17 +152,25 @@ if st.button("Consultar"):
                     pdf.cell(30, 7, f"${r['Copago']:,.0f}", 1, 0, 'R')
                     pdf.cell(30, 7, f"${r['Particular General']:,.0f}", 1, 0, 'R')
                     pdf.cell(30, 7, f"${r['Particular Preferencial']:,.0f}", 1, 1, 'R')
-                    totales["Bono"] += r['Bono Fonasa']; totales["Copago"] += r['Copago']
-                    totales["Gral"] += r['Particular General']; totales["Pref"] += r['Particular Preferencial']
+                    
+                    totales["Bono"] += r['Bono Fonasa']
+                    totales["Copago"] += r['Copago']
+                    totales["Gral"] += r['Particular General']
+                    totales["Pref"] += r['Particular Preferencial']
                 
-                # Fila de Totales
+                # Fila de Totales corregida
                 pdf.set_font('Helvetica', 'B', 7); pdf.set_fill_color(240, 240, 240)
-                pdf.cell(70, 8, " TOTALES ACUMULADOS", 1, 0, 'L', True) [cite: 24]
+                pdf.cell(70, 8, " TOTALES ACUMULADOS", 1, 0, 'L', True)
                 pdf.cell(30, 8, f"${totales['Bono']:,.0f}", 1, 0, 'R', True)
                 pdf.cell(30, 8, f"${totales['Copago']:,.0f}", 1, 0, 'R', True)
                 pdf.cell(30, 8, f"${totales['Gral']:,.0f}", 1, 0, 'R', True)
                 pdf.cell(30, 8, f"${totales['Pref']:,.0f}", 1, 1, 'R', True)
-
-        # Botón de Descarga
-        if 'pdf' in locals():
-            st.download_button("📥 Descargar PDF Reimpreso", data=pdf.output(dest='S'), file_name=f"Reimpresion_{folio_busqueda}.pdf", mime="application/pdf")
+                
+                # Generar descarga
+                out_c = pdf.output(dest='S')
+                st.download_button("📥 Descargar Cotización", data=bytes(out_c), file_name=f"Cotizacion_{folio_busqueda}.pdf", mime="application/pdf")
+            else:
+                st.error("❌ No se encontró el folio.")
+        
+        cur.close()
+        conn.close()
